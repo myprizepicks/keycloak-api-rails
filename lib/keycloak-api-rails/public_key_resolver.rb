@@ -6,7 +6,8 @@ module Keycloak
     end
 
     def find_public_keys
-      JSON::JWK::Set.new(@http_client.get(@realm_id, "protocol/openid-connect/certs")["keys"])
+      jwks_hash = @http_client.get(@realm_id, "protocol/openid-connect/certs")
+      JWT::JWK::Set.new(jwks_hash)
     end
   end
 end
