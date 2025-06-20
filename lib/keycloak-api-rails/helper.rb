@@ -83,11 +83,11 @@ module Keycloak
     end
 
     def self.read_token_from_query_string(uri)
-      if uri.present?
+      if uri && !uri.empty?
         parsed_uri         = URI.parse(uri)
         query              = URI.decode_www_form(parsed_uri.query || "")
         query_string_token = query.detect { |param| param.first == QUERY_STRING_TOKEN_KEY }
-        query_string_token&.second
+        query_string_token&.last
       else
         ""
       end
