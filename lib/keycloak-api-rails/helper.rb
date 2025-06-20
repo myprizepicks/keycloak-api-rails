@@ -102,7 +102,7 @@ module Keycloak
     end
 
     def self.read_token_from_headers(headers)
-      headers["HTTP_AUTHORIZATION"]&.gsub(/^Bearer /, "") || ""
+      (headers["HTTP_AUTHORIZATION"] || headers["Authorization"])&.gsub(/^Bearer /, "") || ""
     end
   end
 end
