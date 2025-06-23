@@ -15,13 +15,15 @@ RSpec.describe Keycloak::Service do
   end
 
   describe "#decode_and_verify" do
-    def create_token(private_key, expiration_date, algorithm)
+    def create_token(private_key, expiration_date, algorithm, kid = nil)
       claim = {
         iss: "Keycloak",
         exp: expiration_date.to_i,
         nbf: Time.local(2018, 1, 1, 0, 0, 0).to_i
       }
-      JWT.encode(claim, private_key, algorithm.to_s)
+      header = {}
+      header[:kid] = kid if kid
+      JWT.encode(claim, private_key, algorithm.to_s, header)
     end
 
     context "when token is nil" do
@@ -97,6 +99,34 @@ RSpec.describe Keycloak::Service do
               expect(service.decode_and_verify(token)).to_not be_nil
             end
           end
+        end
+      end
+
+      context "when using JWK set (like Keycloak)" do
+        let(:jwk) { JWT::JWK.new(private_key, kid: 'test-key-id', use: 'sig') }
+        let(:jwk_set) { JWT::JWK::Set.new(jwk) }
+        let(:jwk_resolver) { double('jwk_resolver', find_public_keys: jwk_set) }
+        let(:jwk_service) { Keycloak::Service.new(jwk_resolver) }
+        let(:token_with_kid) { create_token(private_key, expiration_date, algorithm, 'test-key-id') }
+        let(:token_without_kid) { create_token(private_key, expiration_date, algorithm) }
+
+        it "should successfully decode token with matching kid" do
+          result = jwk_service.decode_and_verify(token_with_kid)
+          expect(result).to_not be_nil
+          expect(result['iss']).to eq('Keycloak')
+        end
+
+        it "should successfully decode token without kid (uses first key)" do
+          result = jwk_service.decode_and_verify(token_without_kid)
+          expect(result).to_not be_nil
+          expect(result['iss']).to eq('Keycloak')
+        end
+
+        it "should raise error when kid doesn't match any key" do
+          token_with_wrong_kid = create_token(private_key, expiration_date, algorithm, 'wrong-key-id')
+          expect {
+            jwk_service.decode_and_verify(token_with_wrong_kid)
+          }.to raise_error(TokenError, "Wrong JWT Format")
         end
       end
     end

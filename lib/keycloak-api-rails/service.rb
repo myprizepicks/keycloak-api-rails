@@ -9,13 +9,15 @@ module Keycloak
 
     def decode_and_verify(token)
       unless token.nil? || token&.empty?
-        public_key    = @key_resolver.find_public_keys
         # First decode without verification to check expiration with our custom logic
-        payload = JWT.decode(token, nil, false)[0]
-        
+        payload, header = JWT.decode(token, nil, false)
+
         if expired?(payload)
           raise TokenError.expired(token)
         end
+        
+        # Get the appropriate public key for verification
+        public_key = find_public_key(header)
         
         # Then verify signature
         decoded_token = JWT.decode(token, public_key, true, 
@@ -37,6 +39,27 @@ module Keycloak
     end
 
     private
+
+    def find_public_key(header)
+      jwk_set = @key_resolver.find_public_keys
+      
+      # Handle the case where the resolver returns a simple public key (like in tests)
+      return jwk_set unless jwk_set.respond_to?(:keys)
+      
+      # Find the key by kid (key ID) from the JWT header
+      kid = header['kid']
+      if kid
+        # Find the JWK with matching kid
+        jwk = jwk_set.find { |key| key.kid == kid }
+        raise JWT::DecodeError, "Unable to find key with kid: #{kid}" unless jwk
+        jwk.verify_key
+      else
+        # If no kid is specified, use the first available key
+        first_jwk = jwk_set.first
+        raise JWT::DecodeError, "No keys available in JWK set" unless first_jwk
+        first_jwk.verify_key
+      end
+    end
 
     def determine_algorithm(token)
       # Extract algorithm from JWT headers without verification
