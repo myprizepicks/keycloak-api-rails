@@ -3,31 +3,34 @@ module Keycloak
     
     def initialize(key_resolver)
       @key_resolver                          = key_resolver
-      @skip_paths                            = Keycloak.config.skip_paths
-      @opt_in                                = Keycloak.config.opt_in
       @logger                                = Keycloak.config.logger
       @token_expiration_tolerance_in_seconds = Keycloak.config.token_expiration_tolerance_in_seconds
     end
 
     def decode_and_verify(token)
       unless token.nil? || token&.empty?
-        public_key    = @key_resolver.find_public_keys
-        decoded_token = JSON::JWT.decode(token, public_key)
+        # First decode without verification to check expiration with our custom logic
+        payload, header = JWT.decode(token, nil, false)
 
-        unless expired?(decoded_token)
-          decoded_token.verify!(public_key)
-          decoded_token
-        else
+        if expired?(payload)
           raise TokenError.expired(token)
         end
+        
+        # Get the appropriate public key for verification
+        public_key = find_public_key(header)
+        
+        # Then verify signature
+        decoded_token = JWT.decode(token, public_key, true, 
+                                 algorithm: determine_algorithm(token),
+                                 verify_expiration: false) # We handle expiration ourselves
+        
+        decoded_token[0]
       else
         raise TokenError.no_token(token)
       end
-    rescue JSON::JWT::VerificationFailed => e
+    rescue JWT::VerificationError => e
       raise TokenError.verification_failed(token, e)
-    rescue JSON::JWK::Set::KidNotFound => e
-      raise TokenError.verification_failed(token, e)
-    rescue JSON::JWT::InvalidFormat
+    rescue JWT::DecodeError => e
       raise TokenError.invalid_format(token, e)
     end
 
@@ -35,26 +38,41 @@ module Keycloak
       Helper.read_token_from_query_string(uri) || Helper.read_token_from_headers(headers)
     end
 
-    def need_middleware_authentication?(method, path, headers)
-      !is_preflight?(method, headers) && (!@opt_in && !should_skip?(method, path))
-    end
-
     private
 
-    def should_skip?(method, path)
-      method_symbol = method&.downcase&.to_sym
-      skip_paths    = @skip_paths[method_symbol]
-      !skip_paths.nil? && !skip_paths.empty? && !skip_paths.find_index { |skip_path| skip_path.match(path) }.nil?
+    def find_public_key(header)
+      jwk_set = @key_resolver.find_public_keys
+      
+      # Handle the case where the resolver returns a simple public key (like in tests)
+      return jwk_set unless jwk_set.respond_to?(:keys)
+      
+      # Find the key by kid (key ID) from the JWT header
+      kid = header['kid']
+      if kid
+        # Find the JWK with matching kid
+        jwk = jwk_set.find { |key| key.kid == kid }
+        raise JWT::DecodeError, "Unable to find key with kid: #{kid}" unless jwk
+        jwk.verify_key
+      else
+        # If no kid is specified, use the first available key
+        first_jwk = jwk_set.first
+        raise JWT::DecodeError, "No keys available in JWK set" unless first_jwk
+        first_jwk.verify_key
+      end
     end
 
-    def is_preflight?(method, headers)
-      method_symbol = method&.downcase&.to_sym
-      method_symbol == :options && !headers["HTTP_ACCESS_CONTROL_REQUEST_METHOD"].nil?
+    def determine_algorithm(token)
+      # Extract algorithm from JWT headers without verification
+      headers = JWT.decode(token, nil, false)[1]
+      headers['alg'] || 'RS256'
+    rescue
+      'RS256' # Default fallback
     end
 
     def expired?(token)
-      token_expiration = Time.at(token["exp"]).to_datetime
-      token_expiration < Time.now + @token_expiration_tolerance_in_seconds.seconds
+      return false unless token["exp"]
+      token_expiration = Time.at(token["exp"])
+      token_expiration < Time.now + @token_expiration_tolerance_in_seconds
     end
   end
 end

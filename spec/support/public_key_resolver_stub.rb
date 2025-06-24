@@ -1,7 +1,10 @@
 module Keycloak
   class PublicKeyResolverStub
     def find_public_keys
-      OpenSSL::PKey::RSA.generate(1024).public_key
+      # Create a mock JWK set that wraps the RSA key
+      key = OpenSSL::PKey::RSA.generate(1024)
+      jwk = JWT::JWK.new(key)
+      JWT::JWK::Set.new(jwk)
     end
   end
 end

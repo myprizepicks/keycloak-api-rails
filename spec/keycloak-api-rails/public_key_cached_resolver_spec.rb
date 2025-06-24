@@ -38,7 +38,7 @@ RSpec.describe Keycloak::Service do
 
       context "and no need to refresh it" do
         before(:each) do
-          Timecop.freeze(Time.now + public_key_cache_ttl.seconds - 10.seconds)
+          Timecop.freeze(Time.now + public_key_cache_ttl - 10)
           @second_public_key                     = resolver.find_public_keys
           @second_cached_public_key_retrieved_at = resolver.cached_public_key_retrieved_at
         end
@@ -58,7 +58,7 @@ RSpec.describe Keycloak::Service do
 
       context "and its TTL has expired" do
         before(:each) do
-          Timecop.freeze(Time.now + public_key_cache_ttl.seconds + 10.seconds)
+          Timecop.freeze(Time.now + public_key_cache_ttl + 10)
           @second_public_key                     = resolver.find_public_keys
           @second_cached_public_key_retrieved_at = resolver.cached_public_key_retrieved_at
         end
