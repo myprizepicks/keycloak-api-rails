@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Keycloak
   class PublicKeyCachedResolverStub
     def initialize(public_key)

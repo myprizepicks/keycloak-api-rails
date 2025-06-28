@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Keycloak
   class PublicKeyCachedResolver
     attr_reader :cached_public_key_retrieved_at
