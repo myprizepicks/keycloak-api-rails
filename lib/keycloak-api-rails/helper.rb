@@ -71,7 +71,7 @@ module Keycloak
     end
 
     def self.assign_current_user_custom_attributes(env, token, attribute_names)
-      env[CURRENT_USER_ATTRIBUTES] = token.select { |key, _value| attribute_names.include?(key) }
+      env[CURRENT_USER_ATTRIBUTES] = token.slice(*attribute_names)
     end
 
     def self.current_user_custom_attributes(env)

@@ -4,14 +4,14 @@ RSpec.describe Keycloak::Service do
   let!(:private_key)  { OpenSSL::PKey::RSA.generate(2048) }
   let!(:public_key)   { private_key.public_key }
   let!(:key_resolver)  { Keycloak::PublicKeyCachedResolverStub.new(public_key) }
-  let!(:service)       { Keycloak::Service.new(key_resolver) }
+  let!(:service)       { described_class.new(key_resolver) }
 
-  before(:each) do
+  before do
     now = Time.local(2018, 1, 9, 12, 0, 0)
     Timecop.freeze(now)
   end
 
-  after(:each) do
+  after do
     Timecop.return
   end
 
@@ -29,7 +29,8 @@ RSpec.describe Keycloak::Service do
 
     context 'when token is nil' do
       let(:token) { nil }
-      it 'should raise an error :no_token' do
+
+      it 'raises an error :no_token' do
         expect do
           service.decode_and_verify(token)
         end.to raise_error(TokenError, 'No JWT token provided')
@@ -38,7 +39,8 @@ RSpec.describe Keycloak::Service do
 
     context 'when token is an empty string' do
       let(:token) { '' }
-      it 'should raise an error :no_token' do
+
+      it 'raises an error :no_token' do
         expect do
           service.decode_and_verify(token)
         end.to raise_error(TokenError, 'No JWT token provided')
@@ -47,7 +49,8 @@ RSpec.describe Keycloak::Service do
 
     context 'when token is in an invalid format' do
       let(:token) { 'coucou' }
-      it 'should raise an error :invalid_format' do
+
+      it 'raises an error :invalid_format' do
         expect do
           service.decode_and_verify(token)
         end.to raise_error(TokenError, 'Wrong JWT Format')
@@ -62,7 +65,7 @@ RSpec.describe Keycloak::Service do
         let(:another_private_key)  { OpenSSL::PKey::RSA.generate(1024) }
         let(:token)                { create_token(another_private_key, expiration_date, algorithm) }
 
-        it 'should raise an error :verification_failed' do
+        it 'raises an error :verification_failed' do
           expect do
             service.decode_and_verify(token)
           end.to raise_error(TokenError, 'Failed to verify JWT token')
@@ -75,7 +78,7 @@ RSpec.describe Keycloak::Service do
         context 'and token is expired' do
           let(:expiration_date) { Time.now - (2 * 24 * 60 * 60) } # 2 days ago
 
-          it 'should raise an error :expiration_date' do
+          it 'raises an error :expiration_date' do
             expect do
               service.decode_and_verify(token)
             end.to raise_error(TokenError, 'JWT token is expired')
@@ -88,16 +91,16 @@ RSpec.describe Keycloak::Service do
           context 'and token is encrypted using RS256' do
             let(:algorithm) { :RS256 }
 
-            it 'should return a not-nil decoded token' do
-              expect(service.decode_and_verify(token)).to_not be_nil
+            it 'returns a not-nil decoded token' do
+              expect(service.decode_and_verify(token)).not_to be_nil
             end
           end
 
           context 'and token is encrypted using RS512' do
             let(:algorithm) { :RS512 }
 
-            it 'should return a not-nil decoded token' do
-              expect(service.decode_and_verify(token)).to_not be_nil
+            it 'returns a not-nil decoded token' do
+              expect(service.decode_and_verify(token)).not_to be_nil
             end
           end
         end
@@ -107,23 +110,23 @@ RSpec.describe Keycloak::Service do
         let(:jwk) { JWT::JWK.new(private_key, kid: 'test-key-id', use: 'sig') }
         let(:jwk_set) { JWT::JWK::Set.new(jwk) }
         let(:jwk_resolver) { double('jwk_resolver', find_public_keys: jwk_set) }
-        let(:jwk_service) { Keycloak::Service.new(jwk_resolver) }
+        let(:jwk_service) { described_class.new(jwk_resolver) }
         let(:token_with_kid) { create_token(private_key, expiration_date, algorithm, 'test-key-id') }
         let(:token_without_kid) { create_token(private_key, expiration_date, algorithm) }
 
-        it 'should successfully decode token with matching kid' do
+        it 'successfullies decode token with matching kid' do
           result = jwk_service.decode_and_verify(token_with_kid)
-          expect(result).to_not be_nil
+          expect(result).not_to be_nil
           expect(result['iss']).to eq('Keycloak')
         end
 
-        it 'should successfully decode token without kid (uses first key)' do
+        it 'successfullies decode token without kid (uses first key)' do
           result = jwk_service.decode_and_verify(token_without_kid)
-          expect(result).to_not be_nil
+          expect(result).not_to be_nil
           expect(result['iss']).to eq('Keycloak')
         end
 
-        it "should raise error when kid doesn't match any key" do
+        it "raises error when kid doesn't match any key" do
           token_with_wrong_kid = create_token(private_key, expiration_date, algorithm, 'wrong-key-id')
           expect do
             jwk_service.decode_and_verify(token_with_wrong_kid)
@@ -140,7 +143,7 @@ RSpec.describe Keycloak::Service do
     let(:header_token)       { 'header_token' }
     let(:query_string_token) { 'query_string_token' }
 
-    before(:each) do
+    before do
       @token = service.read_token(url, headers)
     end
 
@@ -150,8 +153,10 @@ RSpec.describe Keycloak::Service do
           'HTTP_AUTHORIZATION' => "Bearer #{header_token}"
         }
       end
+
       context 'and not in the query string' do
         let(:query_string) { '' }
+
         it 'returns the header token' do
           expect(@token).to eq header_token
         end
@@ -159,6 +164,7 @@ RSpec.describe Keycloak::Service do
 
       context 'and also in the query string' do
         let(:query_string) { "&authorizationToken=#{query_string_token}" }
+
         it 'returns the query string token' do
           expect(@token).to eq query_string_token
         end
@@ -174,6 +180,7 @@ RSpec.describe Keycloak::Service do
 
       context 'and not in the query string' do
         let(:query_string) { '' }
+
         it 'returns an empty token' do
           expect(@token).to eq ''
         end
@@ -181,6 +188,7 @@ RSpec.describe Keycloak::Service do
 
       context 'and query string is nil' do
         let(:query_string) { nil }
+
         it 'returns an empty token' do
           expect(@token).to eq ''
         end
@@ -188,6 +196,7 @@ RSpec.describe Keycloak::Service do
 
       context 'but in the query string' do
         let(:query_string) { "&authorizationToken=#{query_string_token}" }
+
         it 'returns the query string token' do
           expect(@token).to eq query_string_token
         end
