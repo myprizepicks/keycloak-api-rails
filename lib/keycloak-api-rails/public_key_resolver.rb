@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Keycloak
   class PublicKeyResolver
     def initialize(http_client, realm_id)
@@ -6,7 +8,7 @@ module Keycloak
     end
 
     def find_public_keys
-      jwks_hash = @http_client.get(@realm_id, "protocol/openid-connect/certs")
+      jwks_hash = @http_client.get(@realm_id, 'protocol/openid-connect/certs')
       JWT::JWK::Set.new(jwks_hash)
     end
   end

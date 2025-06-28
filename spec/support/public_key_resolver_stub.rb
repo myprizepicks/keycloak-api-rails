@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module Keycloak
   class PublicKeyResolverStub
     def find_public_keys

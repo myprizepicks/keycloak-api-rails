@@ -1,8 +1,10 @@
-require_relative "../lib/keycloak-api-rails"
-require_relative "support/public_key_cached_resolver_stub"
-require_relative "support/public_key_resolver_stub"
-require "timecop"
-require "byebug"
+# frozen_string_literal: true
+
+require_relative '../lib/keycloak-api-rails'
+require_relative 'support/public_key_cached_resolver_stub'
+require_relative 'support/public_key_resolver_stub'
+require 'timecop'
+require 'byebug'
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|

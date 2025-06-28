@@ -1,11 +1,8 @@
+# frozen_string_literal: true
+
 module Keycloak
   class Configuration
-    attr_accessor :server_url
-    attr_accessor :realm_id
-    attr_accessor :token_expiration_tolerance_in_seconds
-    attr_accessor :public_key_cache_ttl
-    attr_accessor :custom_attributes
-    attr_accessor :logger
-    attr_accessor :ca_certificate_file
+    attr_accessor :server_url, :realm_id, :token_expiration_tolerance_in_seconds, :public_key_cache_ttl,
+                  :custom_attributes, :logger, :ca_certificate_file
   end
 end
